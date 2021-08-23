@@ -15,15 +15,14 @@ import times
 import ../imgui
 import sdl2nim/sdl
 
-# 60 // Data
-
 var
   gWindow: sdl.Window
-  gTime: float64 = 0.0f
+  gTime: float64
+
+  ## XXX should this be 5?
   gMouseJustPressed: array[3, bool]
   gMouseCursors: array[ImGuiMouseCursor.high.int32 + 1, sdl.Cursor]
-  gClipboardTextData: pointer = nil                                     # ???
-  gMouseCanUseGlobalState: bool = true
+  gClipboardTextData: pointer
 
 
 proc getTicks(): float64 =
@@ -50,15 +49,49 @@ proc igSDL2SetClipboardText(userData: pointer, text: cstring): void {.cdecl.} =
 ## Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
 ## If you have multiple SDL events and some of them are not meant to be used by dear imgui, you may need to filter events based on their windowID field.
 
+proc charArrayToString*(a: openarray[char]): string =
+  ##  Convert an array of char to a proper string.
+  ##
+  result = ""
+  for c in a:
+    if c == '\0':
+      break
+    add(result, $c)
+
 proc igSDL2_ProcessEvent*(event: sdl.Event) =
   let io = igGetIO()
 
-  if event.kind == sdl.KEYDOWN or event.kind == KEYUP:
-    # Show what key was pressed
-    let key = event.key.keysym.scancode
-    echo "Pressed: ", key
+  if event.kind == sdl.MOUSEWHEEL:
+    if event.wheel.x > 0:
+      io.mouseWheelH += 1
+    elif event.wheel.x < 0:
+      io.mouseWheelH -= 1
 
-    #doAssert key >= 0 && key < IM_ARRAYSIZE(io.KeysDown)
+    if event.wheel.y > 0:
+      io.mouseWheel += 1
+    elif event.wheel.y < 0:
+      io.mouseWheel -= 1
+
+  elif event.kind == sdl.MOUSEBUTTONDOWN:
+    if event.button.button == sdl.BUTTON_LEFT:
+      gMouseJustPressed[0] = true
+    if event.button.button == sdl.BUTTON_RIGHT:
+      gMouseJustPressed[1] = true
+    if event.button.button == sdl.BUTTON_MIDDLE:
+      gMouseJustPressed[2] = true
+
+  elif event.kind == sdl.TEXTINPUT:
+    # XXX Why can't i cast this?
+    let data = charArrayToString(event.text.text)
+    io.addInputCharactersUTF8(data.cstring)
+
+  elif event.kind == sdl.KEYDOWN or event.kind == KEYUP:
+    let key = event.key.keysym.scancode
+
+    # Show what key was pressed
+    # XXX echo "Pressed: ", key
+
+    #doAssert key >= 0 and key < io.KeysDown.length
     io.keysDown[key.int32] = event.kind == sdl.KEYDOWN
 
     let modState = sdl.getModState().ord()
@@ -73,14 +106,11 @@ proc igSDL2_ProcessEvent*(event: sdl.Event) =
     else:
       io.keySuper = (modState and KMOD_GUI.int) != 0
 
-  elif event.kind == sdl.MOUSEBUTTONDOWN:
-    if event.button.button == sdl.BUTTON_LEFT:
-      gMouseJustPressed[0] = true
-    if event.button.button == sdl.BUTTON_RIGHT:
-      gMouseJustPressed[1] = true
-    if event.button.button == sdl.BUTTON_MIDDLE:
-      gMouseJustPressed[2] = true
-
+  elif event.kind == sdl.WINDOWEVENT:
+     if event.window.event == sdl.WINDOWEVENT_FOCUS_GAINED:
+       io.addFocusEvent(true)
+     elif event.window.event == sdl.WINDOWEVENT_FOCUS_LOST:
+       io.addFocusEvent(false)
 
 ### igSDL2Init : Not finish
 proc igSDL2Init(window: sdl.Window): bool =
@@ -120,12 +150,11 @@ proc igSDL2Init(window: sdl.Window): bool =
   io.keyMap[ImGuiKey.Z.int32] = sdl.SCANCODE_Z.int32
 
 
-  #io.SetClipboardTextFn = igSDL2SetClipboardText  #ImGui_ImplSDL2_SetClipboardText
-  #igGetIOio.GetClipboardTextFn = igSDL2GetClipboardText #ImGui_ImplSDL2_GetClipboardText
+  io.setClipboardTextFn = igSDL2SetClipboardText
+  io.getClipboardTextFn = igSDL2GetClipboardText
   io.clipboardUserData = nil
 
   # Load mouse cursors
-  #SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW)
   gMouseCursors[ImGuiMouseCursor.Arrow.int32] = sdl.createSystemCursor(sdl.SYSTEM_CURSOR_ARROW)
   gMouseCursors[ImGuiMouseCursor.TextInput.int32] = sdl.createSystemCursor(sdl.SYSTEM_CURSOR_IBEAM)
   gMouseCursors[ImGuiMouseCursor.ResizeAll.int32] = sdl.createSystemCursor(sdl.SYSTEM_CURSOR_SIZEALL)
@@ -141,16 +170,12 @@ proc igSDL2Init(window: sdl.Window): bool =
   # HELP to translate
   when defined(WIN32):
     echo "win32"
-  else :
-    echo "non win32"
-    discard window
 
   return true
 
 
 ### igSDL2InitForOpenGL - sdlGLcontext ??
 proc igSDL2InitForOpenGL*(window: sdl.Window, sdlGLContext: sdl.GLContext ): bool=
-  discard sdlGLContext #???? // Viewport branch will need this.
   return igSDL2Init(window)
 
 
@@ -174,12 +199,12 @@ proc igSDL2UpdateMousePosAndButtons() =
   let io = igGetIO()
 
   var mouse_x_local, mouse_y_local: cint
-  var mouseButtons = sdl.getMouseState(addr mouse_x_local, addr  mouse_y_local)
-
+  let mouseButtons = sdl.getMouseState(addr mouse_x_local, addr  mouse_y_local).int64
+  let mouseButtons2 = [(BUTTON_LMASK and mouseButtons) > 0,
+                       (BUTTON_MMASK and mouseButtons) > 1,
+                       (BUTTON_RMASK and mouseButtons) > 2]
   for i in 0 ..< 3:
-    if gMouseJustPressed[i]:
-      echo i, " ", gMouseJustPressed[i]
-    io.mouseDown[i] = gMouseJustPressed[i]
+    io.mouseDown[i] = gMouseJustPressed[i] or mouseButtons2[i]
     gMouseJustPressed[i] = false
 
   let mousePosBackup = io.mousePos
@@ -188,9 +213,7 @@ proc igSDL2UpdateMousePosAndButtons() =
   let focused = true
   if focused:
     if io.wantSetMousePos:
-      # XXX ???
-      #sdl.warpMouseInWindow(addr gWindow, mousePosBackup.x.cint, mousePosBackup.y.cint)
-      discard
+      sdl.warpMouseInWindow(nil, mousePosBackup.x.cint, mousePosBackup.y.cint)
     else:
       io.mousePos = ImVec2(x: mouse_x_local.float32, y: mouse_y_local.float32)
 
@@ -198,11 +221,28 @@ proc igSDL2UpdateMousePosAndButtons() =
 proc igSDL2UpdateMouseCursor() =
   let io = igGetIO()
 
+  if (io.configFlags.int32 and ImGuiConfigFlags.NoMouseCursorChange.int32) == 1:
+    return
+
+  var igCursor: ImGuiMouseCursor = igGetMouseCursor()
+  if igCursor == ImGuiMouseCursor.None or io.mouseDrawCursor:
+    # Hide OS mouse cursor if imgui is drawing it or if it wants no cursor
+    discard sdl.showCursor(0)
+  else:
+    # Show OS mouse cursor
+    var cursor = gMouseCursors[igCursor.int32]
+    if cursor == nil:
+      cursor = gMouseCursors[ImGuiMouseCursor.Arrow.int32]
+
+    sdl.setCursor(cursor)
+    discard sdl.showCursor(1)
+
 
 ### igSDL2UpdateGamepads
 proc igSDL2UpdateGamepads() =
   let io = igGetIO()
 
+  # TODO
 
 # igSDL2NewFrame - ok - not tested
 proc igSDL2NewFrame*(window : sdl.Window) =
@@ -234,6 +274,5 @@ proc igSDL2NewFrame*(window : sdl.Window) =
 
   igSDL2UpdateMousePosAndButtons()
   igSDL2UpdateMouseCursor()
-
-  # @TODO: gamepad mapping
+  igSDL2UpdateGamepads()
 

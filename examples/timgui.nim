@@ -46,7 +46,6 @@ proc main() =
   doAssert igOpenGL3Init()
 
   igStyleColorsCherry()
-  #igStyleColorsDark()
 
   var showDemo = true
   var somefloat: float32 = 0.0f
@@ -58,6 +57,8 @@ proc main() =
     while sdl.pollEvent(addr e) != 0:
       if e.kind == sdl.QUIT:
         quitRequested = true
+
+      igSDL2_ProcessEvent(event)
 
 
     igOpenGL3NewFrame()

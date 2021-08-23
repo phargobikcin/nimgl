@@ -13,14 +13,14 @@
 
 import times
 import ../imgui
-import sdl2/sdl
+import sdl2nim/sdl
 
 # 60 // Data
 
 var
   gWindow: sdl.Window
   gTime: float64 = 0.0f
-  gMousePressed: array[3, bool]
+  gMouseJustPressed: array[3, bool]
   gMouseCursors: array[ImGuiMouseCursor.high.int32 + 1, sdl.Cursor]
   gClipboardTextData: pointer = nil                                     # ???
   gMouseCanUseGlobalState: bool = true
@@ -50,8 +50,36 @@ proc igSDL2SetClipboardText(userData: pointer, text: cstring): void {.cdecl.} =
 ## Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
 ## If you have multiple SDL events and some of them are not meant to be used by dear imgui, you may need to filter events based on their windowID field.
 
-proc igSDL2_ProcessEvent(event: sdl.Event): void {.cdecl.} =
+proc igSDL2_ProcessEvent*(event: sdl.Event) =
   let io = igGetIO()
+
+  if event.kind == sdl.KEYDOWN or event.kind == KEYUP:
+    # Show what key was pressed
+    let key = event.key.keysym.scancode
+    echo "Pressed: ", key
+
+    #doAssert key >= 0 && key < IM_ARRAYSIZE(io.KeysDown)
+    io.keysDown[key.int32] = event.kind == sdl.KEYDOWN
+
+    let modState = sdl.getModState().ord()
+    io.keyShift = (modState and KMOD_SHIFT.int) != 0
+    io.keyCtrl = (modState and KMOD_CTRL.int) != 0
+    io.keyAlt = (modState and KMOD_ALT.int) != 0
+
+    # XXX does this work?
+    #when defined windows:
+    when defined(WIN32):
+      io.keySuper = false
+    else:
+      io.keySuper = (modState and KMOD_GUI.int) != 0
+
+  elif event.kind == sdl.MOUSEBUTTONDOWN:
+    if event.button.button == sdl.BUTTON_LEFT:
+      gMouseJustPressed[0] = true
+    if event.button.button == sdl.BUTTON_RIGHT:
+      gMouseJustPressed[1] = true
+    if event.button.button == sdl.BUTTON_MIDDLE:
+      gMouseJustPressed[2] = true
 
 
 ### igSDL2Init : Not finish
@@ -145,6 +173,26 @@ proc igSDL2Shutdown*() =
 proc igSDL2UpdateMousePosAndButtons() =
   let io = igGetIO()
 
+  var mouse_x_local, mouse_y_local: cint
+  var mouseButtons = sdl.getMouseState(addr mouse_x_local, addr  mouse_y_local)
+
+  for i in 0 ..< 3:
+    if gMouseJustPressed[i]:
+      echo i, " ", gMouseJustPressed[i]
+    io.mouseDown[i] = gMouseJustPressed[i]
+    gMouseJustPressed[i] = false
+
+  let mousePosBackup = io.mousePos
+  io.mousePos = ImVec2(x: -high(float32), y: -high(float32))
+
+  let focused = true
+  if focused:
+    if io.wantSetMousePos:
+      # XXX ???
+      #sdl.warpMouseInWindow(addr gWindow, mousePosBackup.x.cint, mousePosBackup.y.cint)
+      discard
+    else:
+      io.mousePos = ImVec2(x: mouse_x_local.float32, y: mouse_y_local.float32)
 
 ### igSDL2UpdateMouseCursor
 proc igSDL2UpdateMouseCursor() =
@@ -187,7 +235,5 @@ proc igSDL2NewFrame*(window : sdl.Window) =
   igSDL2UpdateMousePosAndButtons()
   igSDL2UpdateMouseCursor()
 
-  # Update game controllers (if enabled and available)
-  # XXX todo
-  # igSDL2UpdateGamepads()
+  # @TODO: gamepad mapping
 

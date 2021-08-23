@@ -10,13 +10,14 @@ import ../imgui, ../glfw, ../glfw/native
 
 type
   GlfwClientApi = enum
-    igGlfwClientApiUnkown
-    igGlfwClientApiOpenGl
+    # XXX update
+    igGlfwClientApiUnknown
+    igGlfwClientApiOpenGL
     igGlfwClientApiVulkan
 
 var
   gWindow: GLFWwindow
-  gClientApi = igGlfwClientApiUnkown
+  gClientApi = igGlfwClientApiUnknown
   gTime: float64 = 0.0f
   gMouseJustPressed: array[5, bool]
   gMouseCursors: array[ImGuiMouseCursor.high.int32 + 1, GLFWCursor]
@@ -200,4 +201,4 @@ proc igGlfwShutdown*() =
   for i in 0 ..< ImGuiMouseCursor.high.int32 + 1:
     gMouseCursors[i].destroyCursor()
     gMouseCursors[i] = nil
-  gClientApi = igGlfwClientApiUnkown
+  gClientApi = igGlfwClientApiUnknown

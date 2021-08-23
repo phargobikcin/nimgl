@@ -9,7 +9,7 @@
 ## Based on : https://github.com/ocornut/imgui/blob/master/backends/imgui_impl_sdl.cpp (2020-05-25)
 ##
 ## 
-
+import times
 import ../imgui
 import sdl2/sdl
 
@@ -17,7 +17,7 @@ import sdl2/sdl
 
 var
   gWindow: sdl.Window
-  gTime: uint64 = 0
+  gTime: float64 = 0.0f
   gMousePressed: array[3, bool]
   gMouseCursors: array[ImGuiMouseCursor.high.int32 + 1, sdl.Cursor]
   gClipboardTextData: pointer = nil                                     # ???
@@ -61,7 +61,7 @@ static void ImGui_ImplSDL2_SetClipboardText(void*, const char* text)
 ## Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
 ## If you have multiple SDL events and some of them are not meant to be used by dear imgui, you may need to filter events based on their windowID field.
 
-proc igSDL2_ProcessEvent(event : sdl.Event):  void {.cdecl.} =
+proc igSDL2_ProcessEvent(event: sdl.Event): void {.cdecl.} =
   let io = igGetIO()
 
 
@@ -293,7 +293,7 @@ bool ImGui_ImplSDL2_InitForMetal(SDL_Window* window)
 
 
 ### igSDL2Shutdown - memset no translate
-proc igSDL2Shutdown() =
+proc igSDL2Shutdown*() =
   gWindow = nil
   
   #// Destroy last known clipboard data
@@ -452,38 +452,44 @@ static void ImGui_ImplSDL2_UpdateGamepads()
 }
 ]########################################################################################################
 
-
+proc getTicks(): float64 =
+  let curTime = times.getTime()
+  result = curTime.toUnix().float64 + curTime.nanosecond() / 1000000000
 
 # igSDL2NewFrame - ok - not tested
 proc igSDL2NewFrame*(window : sdl.Window) =
   let io = igGetIO()
-  assert io.fonts.isBuilt() # Error: unhandled exception: C:\Users\ryback08\.nimble\pkgs\nimgl-1.1.6\nimgl\imgui\impl_sdl.nim(460, 10) `io.fonts.isBuilt()`  [AssertionDefect]
+  assert io.fonts.isBuilt()
 
-  #// Setup display size (every frame to accommodate for window resizing)
+  # Setup display size (every frame to accommodate for window resizing)
   var
     w: int32
     h: int32
     displayW: int32
     displayH: int32
+
   sdl.getWindowSize(window, w.addr, h.addr)
-  if (sdl.getWindowFlags(window) and sdl.WINDOW_MINIMIZED) != 0 :
-    w = 0; h = 0
+  if (sdl.getWindowFlags(window) and sdl.WINDOW_MINIMIZED) != 0:
+    w = 0
+    h = 0
+
   sdl.glGetDrawableSize(window, displayW.addr, displayH.addr)
   io.displaySize = ImVec2(x: w.float32, y: h.float32)
-  if (w > 0 and h > 0):
-    io.displayFramebufferScale = ImVec2(x: displayW.float32, y: displayH.float32)
-  #// Setup time step (we don't use SDL_GetTicks() because it is using millisecond resolution)
-  var
-    frequency{.global.}:uint64 = sdl.getPerformanceFrequency()
-    currentTime:uint64 = sdl.getPerformanceCounter()
-  io.deltaTime = if gTime > 0 : ((currentTime.float32 - gTime.float32)/frequency.float32).float32 else: (1.0f / 60.0f).float32
+  if w > 0 and h > 0:
+    io.displayFramebufferScale = ImVec2(x: displayW.float32 / w.float32, y: displayH.float32 / h.float32)
+
+  # Setup time step (we don't use SDL_GetTicks() because it is using millisecond resolution)
+  var currentTime = getTicks()
+  io.deltaTime = if gTime > 0.0f: (currentTime - gTime).float32 else: (1.0f / 60.0f).float32
+
   gTime = currentTime
 
-  igSDL2UpdateMousePosAndButtons();
-  igSDL2UpdateMouseCursor();
+  igSDL2UpdateMousePosAndButtons()
+  igSDL2UpdateMouseCursor()
 
-  #// Update game controllers (if enabled and available)
-  igSDL2UpdateGamepads();
+  # Update game controllers (if enabled and available)
+  # XXX todo
+  # igSDL2UpdateGamepads()
 
 #[
 void ImGui_ImplSDL2_NewFrame(SDL_Window* window)

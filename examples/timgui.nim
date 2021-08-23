@@ -1,52 +1,77 @@
 # Copyright 2018, NimGL contributors.
 
-import nimgl/imgui, nimgl/imgui/[impl_opengl, impl_glfw]
-import nimgl/[opengl, glfw]
+import nimgl/imgui, nimgl/imgui/[impl_opengl, impl_sdl]
+import nimgl/[opengl]
+import sdl2nim/sdl as sdl
+
+template fatalSDLError(s: string) =
+  let error = "ERROR: sdl.createWindow(): " & $sdl.getError()
+  raise newException(Exception, error)
 
 proc main() =
-  doAssert glfwInit()
+  # initialise SDL
+  if sdl.init(sdl.INIT_VIDEO) != 0:
+    fatalSDLError("Could not initialize SDL: ")
 
-  glfwWindowHint(GLFWContextVersionMajor, 3)
-  glfwWindowHint(GLFWContextVersionMinor, 3)
-  glfwWindowHint(GLFWOpenglForwardCompat, GLFW_TRUE)
-  glfwWindowHint(GLFWOpenglProfile, GLFW_OPENGL_CORE_PROFILE)
-  glfwWindowHint(GLFWResizable, GLFW_FALSE)
+  discard glSetAttribute(GLattr.GL_CONTEXT_PROFILE_MASK, GL_CONTEXT_PROFILE_CORE)
 
-  var w: GLFWWindow = glfwCreateWindow(1280, 720)
-  if w == nil:
-    quit(-1)
+  discard glSetAttribute(GLattr.GL_CONTEXT_FLAGS,
+                         GL_CONTEXT_DEBUG_FLAG or GL_CONTEXT_FORWARD_COMPATIBLE_FLAG)
 
-  w.makeContextCurrent()
+  discard glSetAttribute(GLattr.GL_CONTEXT_MAJOR_VERSION, 3)
+  discard glSetAttribute(GLattr.GL_CONTEXT_MINOR_VERSION, 3)
+  discard glSetAttribute(GLattr.GL_DOUBLEBUFFER, 1)
+
+  # create window
+  var window = sdl.createWindow(
+    "hello world",
+    sdl.WINDOWPOS_CENTERED,
+    sdl.WINDOWPOS_CENTERED,
+    800,
+    600,
+    sdl.WINDOW_OPENGL or sdl.WINDOW_SHOWN or sdl.WINDOW_RESIZABLE)
+
+  if window == nil:
+    fatalSDLError("error in sdl.createWindow(): ")
+
+  var glContext = sdl.glCreateContext(window)
+  if glContext == nil:
+    fatalSDLError("Can't create OpenGL context: ")
+  discard sdl.glMakeCurrent(window, glContext)
 
   doAssert glInit()
 
   let context = igCreateContext()
-  #let io = igGetIO()
-
-  doAssert igGlfwInitForOpenGL(w, true)
+  doAssert igSDL2InitForOpenGL(window, glContext)
   doAssert igOpenGL3Init()
 
   igStyleColorsCherry()
+  #igStyleColorsDark()
 
-  var show_demo: bool = true
+  var showDemo = true
   var somefloat: float32 = 0.0f
   var counter: int32 = 0
 
-  while not w.windowShouldClose:
-    glfwPollEvents()
+  var quitRequested = false
+  while not quitRequested:
+    var e: sdl.Event
+    while sdl.pollEvent(addr e) != 0:
+      if e.kind == sdl.QUIT:
+        quitRequested = true
+
 
     igOpenGL3NewFrame()
-    igGlfwNewFrame()
+    igSDL2NewFrame(window)
     igNewFrame()
 
-    if show_demo:
-      igShowDemoWindow(show_demo.addr)
+    if showDemo:
+      igShowDemoWindow(showDemo.addr)
 
     # Simple window
     igBegin("Hello, world!")
 
     igText("This is some useful text.")
-    igCheckbox("Demo Window", show_demo.addr)
+    igCheckbox("Demo Window", showDemo.addr)
 
     igSliderFloat("float", somefloat.addr, 0.0f, 1.0f)
 
@@ -54,6 +79,10 @@ proc main() =
       counter.inc
     igSameLine()
     igText("counter = %d", counter)
+    igSameLine()
+    if igButton("Reset", ImVec2(x: 0, y: 0)):
+      counter =0
+
 
     igText("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / igGetIO().framerate, igGetIO().framerate)
     igEnd()
@@ -66,13 +95,15 @@ proc main() =
 
     igOpenGL3RenderDrawData(igGetDrawData())
 
-    w.swapBuffers()
+    sdl.glSwapWindow(window)
 
   igOpenGL3Shutdown()
-  igGlfwShutdown()
+  igSDL2Shutdown()
   context.igDestroyContext()
 
-  w.destroyWindow()
-  glfwTerminate()
+  sdl.glDeleteContext(glContext)
+  sdl.destroyWindow(window)
+  sdl.quit()
+
 
 main()

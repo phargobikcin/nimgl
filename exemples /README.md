@@ -18,7 +18,7 @@ Xvfb. All the tests go through the CI by compiling them but they are not tested 
 | topengl.nim   | OpenGL bindings work and give out correct data        | :x: |
 | timgui.nim    | ImGui actually build and display demo window          | :x: |
 | tvulkan.nim   | Vulkan bindings work                                  | :x: |
-| imguisdl2.nim | imgui demo in SDL2/opengl3 windows                    | :?: |
+| imguisdl2.nim | ImGui demo in SDL2/opengl3 windows                    | :?: |
 
 
 ###### More to come...

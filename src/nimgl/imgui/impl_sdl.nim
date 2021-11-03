@@ -9,11 +9,11 @@
 ## Based on : https://github.com/ocornut/imgui/blob/master/backends/imgui_impl_sdl.cpp (2020-05-25)
 ## Based on : https://github.com/ryback08/imgui/blob/master/src/imgui/impl_sdl.nim
 ##
+## Test on Windows10
 
 
-import times
 import ../imgui
-import sdl2nim/sdl
+import sdl2_nim/sdl
 
 var
   gWindow: sdl.Window
@@ -24,8 +24,8 @@ var
 
 
 proc getTicks(): float64 =
-  let curTime = times.getTime()
-  result = curTime.toUnix().float64 + curTime.nanosecond() / 1000000000
+  # return Tick in ms
+  result = (sdl.getPerformanceCounter().float64 / sdl.getPerformanceFrequency().float64)
 
 
 proc igSDL2GetClipboardText(userData: pointer): cstring {.cdecl.} =
@@ -266,8 +266,9 @@ proc igSDL2NewFrame*(window : sdl.Window) =
     io.displayFramebufferScale = ImVec2(x: displayW / w, y: displayH / h)
 
   # Setup time step (we don't use SDL_GetTicks() because it is using millisecond resolution)
+  
   var currentTime = getTicks()
-  io.deltaTime = if gTime > 0.0f: (currentTime - gTime).float32 else: (1.0 / 60.0)
+  io.deltaTime = if gTime > 0.0f: ((currentTime - gTime)).float32 else: (1.0 / 60.0).float32
   gTime = currentTime
 
   igSDL2UpdateMousePosAndButtons()

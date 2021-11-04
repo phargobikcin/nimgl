@@ -12,11 +12,13 @@ Xvfb. All the tests go through the CI by compiling them but they are not tested 
 
 ### Which examples are integrated
 
-| File        | Purpose                                               | CI  |
-|-------------|-------------------------------------------------------|-----|
-| tglfw.nim   | GLFW is initialized correctly and that a window opens | :x: |
-| topengl.nim | OpenGL bindings work and give out correct data        | :x: |
-| timgui.nim  | ImGui actually build and display demo window          | :x: |
-| tvulkan.nim | Vulkan bindings work                                  | :x: |
+| File          | Purpose                                               | CI  |
+|---------------|-------------------------------------------------------|-----|
+| tglfw.nim     | GLFW is initialized correctly and that a window opens | :x: |
+| topengl.nim   | OpenGL bindings work and give out correct data        | :x: |
+| timgui.nim    | ImGui actually build and display demo window          | :x: |
+| tvulkan.nim   | Vulkan bindings work                                  | :x: |
+| imguisdl2.nim | ImGui demo in SDL2/opengl3 windows                    | :?: |
+
 
 ###### More to come...
